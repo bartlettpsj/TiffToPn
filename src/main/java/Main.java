@@ -4,14 +4,16 @@ public class Main {
   public static void main(String[] args) {
     String filename = "/Users/pbartlett/desktop/washington3.tiff";
 
-    Imaging imaging = new Imaging();
+    MyImaging myImaging = new MyImaging();
     StopWatch sw = new StopWatch();
-    imaging.convertImagesStd(filename);
+    myImaging.convertImagesStd(filename);
     System.out.printf("Took %d ms to convertImagesStd\n", sw.reset());
-    imaging.convertImagesSequentially(filename);
+    myImaging.convertImagesSequentially(filename);
     System.out.printf("Took %d ms to convertImagesSequentially\n", sw.reset());
-    imaging.convertImagesThreadedSave(filename);
+    myImaging.convertImagesThreadedSave(filename);
     System.out.printf("Took %d ms to convertImagesThreadedSave\n", sw.reset());
+    myImaging.convertImagesToMultiTiff(filename);
+    System.out.printf("Took %d ms to convertImagesToMultiTiff\n", sw.reset());
   }
 
 }

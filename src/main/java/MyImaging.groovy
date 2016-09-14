@@ -1,3 +1,10 @@
+import com.sun.media.imageioimpl.plugins.tiff.TIFFImageWriter
+import org.apache.commons.imaging.ImageFormat
+import org.apache.commons.imaging.ImageFormats
+import org.apache.commons.imaging.Imaging
+import org.apache.commons.imaging.ImagingConstants
+import org.apache.commons.imaging.formats.tiff.constants.TiffConstants
+
 import javax.imageio.ImageIO
 import javax.imageio.ImageReader
 import javax.imageio.ImageWriter
@@ -7,7 +14,18 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-class Imaging {
+import javax.media.jai.NullOpImage;
+import javax.media.jai.OpImage;
+import javax.media.jai.PlanarImage;
+
+import com.sun.media.jai.codec.ImageEncoder;
+import com.sun.media.jai.codec.SeekableStream;
+import com.sun.media.jai.codec.FileSeekableStream;
+import com.sun.media.jai.codec.ImageDecoder;
+import com.sun.media.jai.codec.ImageCodec;
+import com.sun.media.jai.codec.TIFFEncodeParam;
+
+class MyImaging {
 
   def banana = 1
 
@@ -32,11 +50,10 @@ class Imaging {
   def images = []
   def ImageReader imageReader
   def ImageInputStream inputStream
+  def TIFFImageWriter tiffWriter
 
   // Constructor
-  Imaging() {
-    //    ImageIO.scanForPlugins();
-
+  MyImaging() {
     def myreaders = ImageIO.getReaderFormatNames()
     myreaders.each {println "Reader: $it"}
 
@@ -47,8 +64,8 @@ class Imaging {
     if (null == writers || !writers.hasNext()) {
       throw new Exception("Appropriate Tiff writer not found");
     }
+    tiffWriter = writers.next()
   }
-
 
   // Done sequentially
   // Load then save, load then save
@@ -70,7 +87,7 @@ class Imaging {
     (0..nbPages - 1).each {
       // Load TIFF
       def image = reader.read(it)
-      images.add(image)
+      //      images.add(image)
       print "L..${it + 1}"
 
       // Convert to PNG
@@ -84,6 +101,8 @@ class Imaging {
 
   // load all then save all
   def convertImagesSequentially(filename) {
+
+    images = []
 
     ImageInputStream is = ImageIO.createImageInputStream(new File(filename));
     Iterator<ImageReader> iterator = ImageIO.getImageReaders(is);
@@ -123,6 +142,7 @@ class Imaging {
   }
 
   def convertImagesThreadedSave(filename) {
+    images = []
     ImageInputStream is = ImageIO.createImageInputStream(new File(filename));
     Iterator<ImageReader> iterator = ImageIO.getImageReaders(is);
 
@@ -157,6 +177,49 @@ class Imaging {
     executor.shutdown()
     executor.awaitTermination(Long.MAX_VALUE, TimeUnit.DAYS);
     println()
+  }
+
+  def convertImagesToMultiTiff(filename) {
+    images = []
+    ImageInputStream is = ImageIO.createImageInputStream(new File(filename));
+    Iterator<ImageReader> iterator = ImageIO.getImageReaders(is);
+
+    if (iterator == null || !iterator.hasNext()) {
+      throw new IOException("Image file format not supported by ImageIO: " + filename);
+    }
+    // We are just looking for the first reader compatible:
+    ImageReader reader = (ImageReader) iterator.next()
+    reader.setInput(is)
+    inputStream = is
+
+    def nbPages = reader.getNumImages(true);
+    println "There are $nbPages pages in TIFF file"
+
+    print "Loaded image"
+    imageReader = reader
+    (0..nbPages - 1).each {
+
+      // Load TIFF
+      def image = reader.read(it)
+      images.add(image)
+      print "..${it + 1}"
+    }
+    println()
+
+
+    // Save to multipage as JPG compression - assumes at least one page!
+    TIFFEncodeParam params = new TIFFEncodeParam()
+    params.setCompression(TIFFEncodeParam.COMPRESSION_JPEG_TTN2)
+    OutputStream out = new FileOutputStream("multi-page.tif")
+    ImageEncoder encoder = ImageCodec.createImageEncoder("tiff", out, params)
+    List<BufferedImage> list = new ArrayList<BufferedImage>(images.size())
+    //      images.each { list.add(it)}
+    for (int i = 1; i < images.size(); i++) {
+      list.add(images[i]);
+    }
+    params.setExtraImages(list.iterator());
+    encoder.encode(images[0]);
+    out.close()
   }
 
   def loadTiff(filename) {
