@@ -4,6 +4,10 @@ import org.apache.commons.imaging.ImageFormats
 import org.apache.commons.imaging.Imaging
 import org.apache.commons.imaging.ImagingConstants
 import org.apache.commons.imaging.formats.tiff.constants.TiffConstants
+import org.apache.pdfbox.pdmodel.PDDocument
+import org.apache.pdfbox.pdmodel.PDPage
+import org.apache.pdfbox.rendering.ImageType
+import org.apache.pdfbox.rendering.PDFRenderer
 
 import javax.imageio.ImageIO
 import javax.imageio.ImageReader
@@ -272,5 +276,36 @@ class MyImaging {
     }
 
     executor.shutdown()
+  }
+
+  def convertPdfToMultiTiff(String pdfFilename, String tiffFilename) {
+    def pdf = PDDocument.load(new File(pdfFilename))
+    println pdf.dump()
+    PDFRenderer pdfRenderer = new PDFRenderer(pdf);
+
+    (1..pdf.pages.count).each {
+      PDPage page = (PDPage) pdf.documentCatalog.pages.get(it-1)
+
+      BufferedImage image = pdfRenderer.renderImageWithDPI(it-1, 200, ImageType.BINARY);
+      images.add(image) // could be done easier
+    }
+
+    // Save to multipage as JPG compression - assumes at least one page!
+    TIFFEncodeParam params = new TIFFEncodeParam()
+    params.setCompression(TIFFEncodeParam.COMPRESSION_GROUP4) // COMPRESSION_JPEG_TTN2)
+    OutputStream out = new FileOutputStream(tiffFilename)
+    ImageEncoder encoder = ImageCodec.createImageEncoder("tiff", out, params)
+    List<BufferedImage> list = new ArrayList<BufferedImage>(images.size())
+    for (int i = 1; i < images.size(); i++) {
+      list.add(images[i]);
+    }
+    params.setExtraImages(list.iterator());
+    encoder.encode(images[0]);
+    out.close()
+
+
+
+
+
   }
 }
